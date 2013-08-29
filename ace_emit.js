@@ -28,3 +28,6 @@ Ace_Emit.prototype.updateCursor = function (cursor_position){
     else if(moved_down) this.system.cursorMoved("down");
 }
 
+Ace_Emit.prototype.removeChar = function (){
+    this.system.removeChar ();
+}

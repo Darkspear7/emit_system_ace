@@ -42,6 +42,16 @@
                 alert ("Inserted text is bigger than 1 character");
             }
         }
+        if(e.data.action == "removeText"){
+            if(e.data.text.length == 1){
+                ace_emit.removeChar();
+            } else {
+                alert ("Removed text is bigger than 1 character");
+            }
+        }
+        else {
+            debug(e.data);
+        }
     });
 
     editor.getSession().selection.on("changeCursor", function(e){

@@ -24,6 +24,42 @@ Atom.prototype.length = function (){
     return this.data.length;
 }
 
+Atom.prototype.remove = function (position){
+    if(position == 0){
+        this.data = data.slice(1);
+    } else {
+        var data_part_1 = this.data.slice(0, position);
+        var data_part_2 = this.data.slice(position + 1);
+        this.data = data_part_1 + data_part_2;
+    }
+}
+
+Atom.prototype.removeHead = function (){
+    this.data = this.data.slice(1);
+    if(this.data.length < 1){ 
+        // if you remove the atom you have to check if right is the
+        // same type as left and if so merge them
+        if(this.left.type == this.right.type){
+            this.left.data += this.right.data;
+            this.left.right = this.right.right;
+            this.right.left = this.left;
+        } else {
+            // remove the atom from the chain
+            this.left.right = this.right;
+            this.right.left = this.left;
+        }
+    }
+}
+
+Atom.prototype.removeTail = function (){
+    this.data = this.data.slice(0, -1);
+    if(this.data.length < 1){
+        // remove the atom from the chain
+        this.left.right = this.right;
+        this.right.left = this.left;
+    }
+}
+
 var Cursor = function (){
     this.left_atom = undefined;
     this.right_atom = undefined;
@@ -59,6 +95,49 @@ Cursor.prototype.at_start = function (){
 
 Cursor.prototype.appendLeft = function (atom){
     this.left_atom.append_end(atom);
+}
+
+Cursor.prototype.removeChar = function (){
+    // have to remove the right character because of how ace work
+    // Ace triggers changeCursor first and then change for backspace
+    // inverse for input characters
+    if(this.inside_atom){
+        // this mean that either you are on the last position and need
+        // to delete the last element
+        if(this.atom_position == this.current_atom.length() - 1){
+            this.current_atom.removeTail();
+            if(this.current_atom.length() > 0){
+                this.left_atom = this.current_atom;
+            } else {
+                this.left_atom = this.current_atom.left;
+            }
+            this.current_atom = undefined;
+            this.inside_atom = false;
+        } else {
+            // or that you are inside and need to delete the right element
+            this.current_atom.remove(this.atom_position);
+        }
+    } else {
+        // this mean that you we're inside an atom and need to delete the begining
+        // store left atom length in case of a merge
+        var left_length = this.left_atom.length();
+        // l - c - r - rr
+        // in case we delete r we merge rr with l
+        var merged = this.left_atom.type == this.right_atom.right.type;
+
+        this.right_atom.removeHead();
+        if(this.right_atom.length() == 0){
+            if(merged){
+                this.inside_atom = true;
+                // because merge is done to the left
+                this.current_atom = this.left_atom;
+                this.left_atom = this.current_atom.left;
+                this.atom_position = left_length;
+            } else {
+                this.right_atom = this.right_atom.right;
+            }
+        } 
+    }
 }
 
 Cursor.prototype.appendRight = function (atom){
@@ -230,7 +309,8 @@ var EmitSystem = function emit_system (){
     this.buffer = new Buffer();
     
     this.move_by_add = false; 
-    
+    this.move_by_del = false;
+
     var tmp_eof_atom = new Atom ("eof");
     var tmp_bof_atom = new Atom ("bof");
     tmp_eof_atom.left = tmp_bof_atom;
@@ -308,6 +388,12 @@ EmitSystem.prototype.cursorMoved = function (direction){
         this.move_by_add = false;
         return;
     }
+    // not used because i can't test if user pressed backspace
+    // before cursor changes...
+    if(this.move_by_del){
+        this.move_by_del = false;
+    }
+
     if(direction == "left"){
         this._cursor_left ();
     }
@@ -340,6 +426,10 @@ function _char_to_symbol (character){
     else {
         return "word";
     }
+}
+
+EmitSystem.prototype.removeChar = function (){
+    this.cursor.removeChar ();
 }
 
 EmitSystem.prototype.processChar = function (character){
